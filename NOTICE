@@ -1,0 +1,14 @@
+مخبز حارتنا (Makhbaz Haratna)
+Copyright 2026 basim52
+
+This product is a modified version (Arabic/RTL remix) of the "Merge Bakery"
+game template from OpenGame (https://github.com/nexu-io/opengame),
+licensed under the Apache License, Version 2.0.
+
+Changes made (2026-11-26): translated all UI to Arabic with right-to-left
+layout; renamed the game; replaced pastries with Saudi sweets (لقيمات، كليجا،
+معمول، كيكة التمر); redrew customers (شماغ، حجاب، طاقية); prices in riyal;
+added a landscape side panel for tablets, a rotate hint for phones in
+landscape, and a locally stored best score.
+
+See LICENSE for the full Apache License 2.0 text.

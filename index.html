@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>مخبز حارتنا 🥐 لعبة دمج الحلويات</title>
+<meta name="description" content="لعبة عائلية: اخبز العجينة، ادمج الحلويات المتشابهة (لقيمات، كليجا، معمول، كيكة التمر) وقدّمها لزباين الحارة قبل ما يخلص الوقت.">
+<meta name="theme-color" content="#4c2a29">
+<meta property="og:title" content="مخبز حارتنا"><meta property="og:description" content="اخبز، ادمج، وقدّم للزباين! لعبة عائلية على الجوال والتابلت."><meta property="og:image" content="cover.webp">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+/* Remixed from OpenGame "Merge Bakery" (Apache-2.0) — see NOTICE */
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#2a1716;touch-action:none;font-family:Tajawal,"Noto Sans Arabic",system-ui,sans-serif}
+body{display:flex;align-items:center;justify-content:center;gap:28px;height:100dvh;background:radial-gradient(circle at 50% 30%,#5b3330,#211312 75%)}
+canvas{display:block;width:min(100vw,56.25dvh);height:min(100dvh,177.7778vw);touch-action:none;user-select:none;-webkit-user-select:none;border-radius:0;box-shadow:0 10px 40px #0008}
+aside{display:none;color:#fff3dc;max-width:320px;line-height:1.7}
+aside h1{margin:0 0 6px;font-size:34px;color:#ffd77a}
+aside p{margin:0 0 10px;font-size:17px;color:#f3d9c3}
+aside ol{margin:0 0 12px;padding-inline-start:22px;font-size:17px}
+aside .chain{background:#ffffff14;border-radius:14px;padding:10px 12px;font-size:16px;margin-bottom:12px}
+aside small{display:block;font-size:12px;color:#c9a99a;line-height:1.5}
+aside a{color:#ffd77a}
+#rot{display:none;position:fixed;top:50%;right:12px;transform:translateY(-50%);max-width:calc(50vw - 56.25dvh/2 - 24px);background:#0008;color:#ffe2a0;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.6;text-align:center;pointer-events:none;z-index:2}
+@media (orientation:landscape) and (max-height:539px){#rot{display:block}}
+@media (orientation:landscape) and (min-width:760px) and (min-height:540px){aside{display:block}canvas{height:min(96dvh,177.7778vw);width:min(100vw,54dvh);border-radius:18px}}
+@media (orientation:landscape) and (max-height:620px){aside h1{font-size:28px}aside p,aside ol{font-size:15px}aside{line-height:1.55}}
+</style></head><body>
+<canvas width="450" height="800" aria-label="لعبة مخبز حارتنا"></canvas>
+<div id="rot">📱 لف الجوال بالطول عشان تلعب براحتك</div>
+<aside>
+<h1>مخبز حارتنا 🥐</h1>
+<p>زباين الحارة جوعانين! اخبز وادمج وقدّم قبل ما يخلص الوقت.</p>
+<ol>
+<li>اضغط <b>الفرن</b> تطلع لك عجينة.</li>
+<li>اسحب حبتين متشابهة فوق بعض تصير حلوى أغلى.</li>
+<li>اسحب الحلوى اللي يبيها الزبون فوق طلبه.</li>
+<li>اجمع <b>250 ريال</b> في <b>90 ثانية</b>.</li>
+</ol>
+<div class="chain">عجينة ← لقيمات ← كليجا ← معمول ← كيكة التمر 👑</div>
+<small>مبنية على قالب «Merge Bakery» من مشروع <a href="https://github.com/nexu-io/opengame" target="_blank" rel="noopener">OpenGame</a> برخصة Apache 2.0، وعُرّبت وعُدّلت. <a href="https://github.com/basim52/makhbaz-haratna" target="_blank" rel="noopener">الكود</a></small>
+</aside>
+<script>
+'use strict';
+const canvas=document.querySelector('canvas'), ctx=canvas.getContext('2d');
+const W=450,H=800,FONT='Tajawal,"Noto Sans Arabic",system-ui,sans-serif';
+const BEST_KEY='makhbaz-haratna-best';
+let best=0;try{best=+localStorage.getItem(BEST_KEY)||0}catch{}
+let phase='ready',score=0,elapsed=0,last=0,muted=false,audio=null,shake=0,particles=[],floats=[],pointer=null;
+const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function box(x,y,w,h,color,r=12){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+function text(s,x,y,size=20,color='#fff',align='center'){const mw=align==='left'?W-x-18:align==='right'?x-18:Math.min(414,2*Math.min(x-8,W-x-8));fitText(s,x,y,size,color,mw,align);}
+function line(x,y,a,b,color,width=3){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(a,b);ctx.stroke();}
+
+let artTime=0,impactRings=[];
+function fitText(s,x,y,size,color,maxWidth,align='center'){
+ ctx.direction='rtl';
+ ctx.font=`700 ${size}px ${FONT}`;
+ while(ctx.measureText(s).width>maxWidth&&size>10){size-=.5;ctx.font=`700 ${size}px ${FONT}`;}
+ ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillText(s,x,y);
+}
+function gradient(x,y,w,h,top,bottom,r=12){const g=ctx.createLinearGradient(x,y,x,y+h);g.addColorStop(0,top);g.addColorStop(1,bottom);box(x,y,w,h,g,r);}
+function guide(x1,y1,x2,y2,label){
+ if((phase!=='ready'&&!(phase==='playing'&&elapsed<3))||pointer!==null)return;
+ const t=(artTime%2)/2, eased=t*t*(3-2*t),x=x1+(x2-x1)*eased,y=y1+(y2-y1)*eased;
+ ctx.save();ctx.globalAlpha=.75;line(x1,y1,x2,y2,'#fff5c9',3);circle(x1,y1,8,'#fff5c9');ctx.globalAlpha=1;
+ ctx.translate(x,y);ctx.rotate(-.25);ctx.shadowColor='#201524';ctx.shadowBlur=5;
+ box(-8,-4,27,30,'#fff8e4',9);box(-8,-26,10,33,'#fff8e4',5);box(0,-9,10,22,'#fff8e4',5);box(8,-5,10,20,'#fff8e4',5);line(-7,20,-19,7,'#fff8e4',11);ctx.restore();
+ box(16,729,418,53,'#17263b',14);fitText(label,225,755,17,'#fff3c5',390);
+}
+
+function tone(f=440){if(muted||!audio)return;const o=audio.createOscillator(),g=audio.createGain();o.type='triangle';o.frequency.setValueAtTime(f,audio.currentTime);o.frequency.exponentialRampToValueAtTime(f*.6,audio.currentTime+.13);g.gain.setValueAtTime(.07,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.16);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.17);}
+function unlock(){if(!audio){const A=window.AudioContext||window.webkitAudioContext;if(A)try{audio=new A()}catch{}}if(audio?.state==='suspended')audio.resume().catch(()=>{});}
+function burst(x,y,color='#ffdc78',label=''){for(let i=0;i<28;i++)particles.push({x,y,vx:rand(-170,170),vy:rand(-230,70),life:.8,color});impactRings.push({x,y,life:.24});if(label)floats.push({x,y,s:label,life:1});shake=8;tone(660);}
+function finish(won){if(phase!=='playing')return;phase=won?'won':'lost';pointer=null;if(score>best){best=score;try{localStorage.setItem(BEST_KEY,String(best))}catch{}}tone(won?880:160);}
+function start(){if(phase==='ready')phase='playing';}
+function restart(){phase='ready';score=0;elapsed=0;pointer=null;particles=[];floats=[];impactRings=[];artTime=0;shake=0;init();}
+function pill(label,x,y,w=100){box(x-w/2,y-17,w,34,'#3a2430',12);text(label,x,y,17);}
+function header(title,sub){fitText(title,428,36,27,'#ffe2a0',330,'right');fitText(sub,428,70,15,'#f0cdb9',400,'right');box(14,15,48,43,'#3a2430');text(muted?'🔇':'🔊',38,37,21);}
+function hint(s){box(16,729,418,53,'#3a2430');fitText(s,225,755,17,'#ffdf8a',390);}
+function frame(ts){const dt=last?Math.min((ts-last)/1000,.04):0;last=ts;artTime+=dt;if(phase==='playing'){elapsed+=dt;update(dt);}ctx.clearRect(0,0,W,H);ctx.save();if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake=Math.max(0,shake-dt*30);}draw();for(const r of impactRings){r.life-=dt;ctx.save();ctx.globalAlpha=Math.max(0,r.life/.24);circle(r.x,r.y,12+(1-r.life/.24)*32,'#fff8e4');ctx.restore();}impactRings=impactRings.filter(r=>r.life>0);for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=280*dt;circle(p.x,p.y,Math.max(0,p.life)*5,p.color);}particles=particles.filter(p=>p.life>0);for(const p of floats){p.life-=dt;p.y-=dt*48;ctx.save();ctx.shadowColor='#211b32';ctx.shadowBlur=5;text(p.s,clamp(p.x,90,360),p.y,26+(1-p.life)*4,'#ffdf8a');ctx.restore();}floats=floats.filter(p=>p.life>0);ctx.restore();
+ guide(370,410,273,410,'اسحب الحبتين المتشابهة فوق بعض');
+ if(phase==='won'||phase==='lost'){ctx.save();ctx.globalAlpha=.55;box(0,0,W,H,'#120a0a',0);ctx.restore();box(25,238,400,310,'#2b1a22',24);text(phase==='won'?'كفو عليك! 🎉':'ولا يهمك، جرّب مرة ثانية!',225,289,30,'#ffdf8a');text(result(),225,343,19);text('النقاط: '+score,225,385,23);text('أفضل نتيجة: '+best,225,420,17,'#f0cdb9');box(95,457,260,62,'#ffd077',18);text('العب مرة ثانية ↻',225,488,24,'#322435');}
+ requestAnimationFrame(frame);}
+function pos(e){const b=canvas.getBoundingClientRect();return{x:(e.clientX-b.left)*W/b.width,y:(e.clientY-b.top)*H/b.height};}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();if(pointer!==null)return;unlock();const p=pos(e);if(p.x<=64&&p.y<=64){muted=!muted;return;}if(phase==='won'||phase==='lost'){if(p.x>=95&&p.x<=355&&p.y>=457&&p.y<=519)restart();return;}pointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);start();down(p);});
+canvas.addEventListener('pointermove',e=>{if(pointer===e.pointerId&&phase==='playing')move(pos(e));});
+function release(e,cancel=false){if(pointer!==e.pointerId)return;pointer=null;if(phase==='playing'){if(cancel)cancelInput();else up(pos(e));}}
+canvas.addEventListener('pointerup',e=>release(e));canvas.addEventListener('pointercancel',e=>release(e,true));
+window.addEventListener('blur',()=>{pointer=null;cancelInput();last=0;});
+document.addEventListener('visibilitychange',()=>{pointer=null;cancelInput();last=0;});
+window.__omGame={state:()=>({phase,score,elapsed,...details()}),start,restart};
+
+let board,customers,coins=0,drag=null,ovenCooldown=0,served=0;
+const NAMES=['عجينة','لقيمات','كليجا','معمول','كيكة التمر'];
+const colors=['#fce3ad','#e9a94a','#c9853f','#f1dcc0','#8a4b2c'];
+// RTL board: first cell on the right.
+const cellPos=i=>({x:370-(i%4)*97,y:410+Math.floor(i/4)*91});
+function cellAt(p){for(let i=0;i<12;i++){const c=cellPos(i);if(Math.abs(c.x-p.x)<43&&Math.abs(c.y-p.y)<43)return i;}return -1;}
+const custX=i=>360-i*134;
+function order(){return{want:1+Math.floor(Math.random()*4),wait:28};}
+function init(){board=Array(12).fill(-1);board[0]=0;board[1]=0;board[2]=1;customers=[order(),order(),order()];customers[0].want=1;coins=0;served=0;drag=null;ovenCooldown=0;}
+function down(p){if(p.y>650&&p.y<721){if(ovenCooldown>0)return;const empty=board.indexOf(-1);if(empty>=0){board[empty]=0;ovenCooldown=.18;tone(290);burst(cellPos(empty).x,cellPos(empty).y,'#fce3ad');}else burst(225,675,'#ed8d9a','ادمج عشان تفضي مكان');return;}const i=cellAt(p);if(i>=0&&board[i]>=0)drag={i,x:p.x,y:p.y};}
+function move(p){if(drag){drag.x=p.x;drag.y=p.y;}}
+function up(p){if(!drag)return;const i=drag.i,v=board[i];drag=null;
+ if(p.y>160&&p.y<330){let c=-1;for(let k=0;k<3;k++)if(Math.abs(p.x-custX(k))<67)c=k;if(c>=0){if(customers[c].want===v){const earned=[0,15,35,75,150][v];board[i]=-1;coins+=earned;score=coins;served++;customers[c]=order();burst(custX(c),250,'#ffe08a',`+${earned} ريال`);if(coins>=250)finish(true);}else burst(custX(c),250,'#ed8d9a','مو هذا طلبي!');}return;}
+ const j=cellAt(p);if(j<0||j===i)return;if(board[j]===v&&v<4){board[j]=v+1;board[i]=-1;const c=cellPos(j);burst(c.x,c.y,colors[v+1],NAMES[v+1]);}else if(board[j]===-1){board[j]=v;board[i]=-1;tone(350);} }
+function cancelInput(){drag=null;}
+function update(dt){ovenCooldown=Math.max(0,ovenCooldown-dt);customers.forEach((c,i)=>{c.wait-=dt;if(c.wait<=0){customers[i]=order();tone(170);}});if(elapsed>=90)finish(coins>=250);}
+function pastry(v,x,y,size=30){ctx.save();ctx.translate(x,y);ctx.scale(size/30,size/30);ctx.shadowColor='#623323';ctx.shadowBlur=5;ctx.shadowOffsetY=4;
+ if(v===0){gradient(-27,-21,54,43,'#fff1cb','#dba46d',20);circle(-10,-11,5,'#fff8df');for(let i=0;i<7;i++)circle(-15+i*5,9+Math.sin(i)*3,1,'#b98454');}
+ if(v===1){// لقيمات: golden balls drizzled with date syrup
+  gradient(-28,6,56,14,'#f5f0e6','#d7cdbd',7);ctx.shadowBlur=2;
+  for(const [bx,by] of [[-15,4],[0,6],[15,4],[-8,-9],[8,-9],[0,-21]]){circle(bx,by,9,'#e39a32');circle(bx-3,by-3,3.5,'#ffd27a');}
+  ctx.shadowBlur=0;ctx.strokeStyle='#6a2f16';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-22,0);ctx.bezierCurveTo(-10,-14,0,10,10,-8);ctx.bezierCurveTo(16,-16,22,4,24,-2);ctx.stroke();
+  circle(-4,-14,1.4,'#fff6dd');circle(6,-2,1.4,'#fff6dd');circle(-12,-2,1.4,'#fff6dd');}
+ if(v===2){// كليجا: round cookie with stamped pattern
+  circle(0,0,26,'#b06a2c');circle(0,-2,24,'#d9923f');ctx.shadowBlur=0;ctx.strokeStyle='#9a5522';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(0,-2,15,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(0,-2,7,0,Math.PI*2);ctx.stroke();
+  for(let i=0;i<8;i++){const a=i*Math.PI/4;circle(Math.cos(a)*20,-2+Math.sin(a)*20,1.8,'#8d4a1c');}circle(-8,-11,3,'#f2b866');}
+ if(v===3){// معمول: dome with ridges and sugar dust
+  ctx.beginPath();ctx.moveTo(-26,14);ctx.quadraticCurveTo(-26,-24,0,-24);ctx.quadraticCurveTo(26,-24,26,14);ctx.closePath();
+  const g=ctx.createLinearGradient(0,-24,0,14);g.addColorStop(0,'#fbe9cf');g.addColorStop(1,'#d9b083');ctx.fillStyle=g;ctx.fill();
+  ctx.shadowBlur=0;ctx.strokeStyle='#b88a5c';ctx.lineWidth=2;for(let i=-3;i<=3;i++){ctx.beginPath();ctx.moveTo(i*7,12);ctx.quadraticCurveTo(i*5,-6,i*2.5,-20);ctx.stroke();}
+  box(-27,12,54,6,'#c99d6e',3);for(let i=0;i<9;i++)circle(rand2(i)*40-20,-14+rand2(i+9)*22,1.3,'#ffffff');}
+ if(v===4){// كيكة التمر الملكية
+  gradient(-28,-6,56,30,'#9a5a34','#5d2f1d',6);box(-28,2,56,5,'#f6dcb2',1);gradient(-30,-17,60,14,'#c98a52','#8a4b2c',8);
+  for(let i=0;i<4;i++){ctx.save();ctx.translate(-18+i*12,-17);ctx.rotate(.5);ctx.fillStyle='#4a1f12';ctx.beginPath();ctx.ellipse(0,0,6,3.6,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+  gradient(-17,-36,34,15,'#ffe99c','#d7a038',3);for(let i=0;i<3;i++)circle(-14+i*14,-37,5,'#ffe9a6');circle(0,-30,3,'#2e9a6a');}
+ ctx.restore();}
+function rand2(i){const s=Math.sin(i*12.9898)*43758.5453;return s-Math.floor(s);}
+function customer(i,x,mood){
+ const skin=['#e8b98f','#f1c9a5','#d9a47a'][i];
+ if(i===0){// رجل بشماغ أحمر وعقال
+  ctx.save();ctx.beginPath();ctx.moveTo(x-30,300);ctx.quadraticCurveTo(x-32,246,x,244);ctx.quadraticCurveTo(x+32,246,x+30,300);ctx.closePath();ctx.fillStyle='#fdfbf7';ctx.fill();ctx.clip();
+  ctx.fillStyle='#d23a44';for(let a=-40;a<40;a+=8)for(let b=240;b<304;b+=8)if(((a+b)/8|0)%2===0)ctx.fillRect(x+a,b,4,4);ctx.restore();
+  circle(x,276,19,skin);box(x-25,249,50,7,'#1d1a1c',4);ctx.fillStyle='#3b2b25';ctx.beginPath();ctx.arc(x,276,20,0.12*Math.PI,0.88*Math.PI);ctx.arc(x,279,13,0.9*Math.PI,0.1*Math.PI,true);ctx.closePath();ctx.fill();}
+ else if(i===1){// سيدة بحجاب
+  circle(x,272,29,'#5f4b8b');box(x-29,272,58,28,'#5f4b8b',6);circle(x,274,19,skin);ctx.save();ctx.globalAlpha=.25;circle(x+10,258,10,'#fff');ctx.restore();}
+ else {// ولد بطاقية
+  circle(x,276,20,skin);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(x,265,19,Math.PI,0);ctx.fill();box(x-20,262,40,5,'#e9e4da',2);}
+ circle(x-7,273,2.2,'#3b2a2a');circle(x+7,273,2.2,'#3b2a2a');text(mood?'⌢':'⌣',x,284,18,'#553c55');circle(x-13,280,3.5,'#e9938d');circle(x+13,280,3.5,'#e9938d');
+}
+function draw(){gradient(0,0,450,800,'#9b5945','#4c2a29',0);
+ // awning stripes in green & white
+ for(let i=0;i<9;i++){box(i*56,135,28,198,i%2?'#e6d3b4':'#f6e7cc',0);}
+ for(let i=0;i<10;i++){ctx.fillStyle=i%2?'#1f7a55':'#f4efe4';ctx.beginPath();ctx.moveTo(i*45,128);ctx.lineTo(i*45+45,128);ctx.lineTo(i*45+45,140);ctx.arc(i*45+22.5,140,22.5,0,Math.PI);ctx.closePath();ctx.fill();}
+ gradient(18,340,414,306,'#c68b55','#88512e',12);for(let y=368;y<647;y+=28){line(24,y,426,y,'#a66a3d',2);for(let x=37;x<420;x+=71)line(x,y+8,x+35,y+11,'#d6a16d',1);}
+ header('مخبز حارتنا 🥐','اخبز ← ادمج ← قدّم للزبون');pill(`${coins} / 250 ريال`,340,108,170);pill(`⏱ ${Math.ceil(90-elapsed)}`,90,108,110);
+ box(14,163,422,170,'#ffe3ce',18);for(let i=0;i<3;i++){const x=custX(i),c=customers[i];box(x-55,172,110,70,'#fff8eb');pastry(c.want,x,197,22);text(NAMES[c.want],x,229,14,'#6b4355');customer(i,x,c.wait<9);box(x-43,312,86,8,'#d8b6aa',3);box(x+43-86*clamp(c.wait/28,0,1),312,86*clamp(c.wait/28,0,1),8,c.wait<9?'#d9534f':'#2e9a6a',3);}
+ text('اسحب الحبتين المتشابهة فوق بعض عشان تكبر',225,352,16,'#fff5df');for(let i=0;i<12;i++){const p=cellPos(i);box(p.x-43,p.y-37,86,78,'#76472f',12);gradient(p.x-40,p.y-35,80,72,'#e0b886','#c68f5d',10);if(board[i]>=0&&drag?.i!==i)pastry(board[i],p.x,p.y,29);}
+ box(65,653,320,65,'#db9469',18);box(313,664,55,40,'#593f51',8);text('🔥',340,684,26,'#ffd37d');text('اضغط الفرن · تطلع عجينة',190,684,19,'#412c40');if(drag)pastry(board[drag.i],drag.x,drag.y,33);
+ hint(phase==='ready'?'☝ اضغط الفرن، واسحب عجينتين فوق بعض':'الزبون ينتظر 28 ثانية · اجمع 250 ريال في 90 ثانية');
+}
+function result(){return 'الدخل '+coins+' ريال · الطلبات '+served;}
+function details(){return{board:[...board],customers:customers.map(c=>({...c})),coins,target:250,served,timeLeft:Math.max(0,90-elapsed)};}
+
+restart();
+const go=()=>requestAnimationFrame(frame);
+if(document.fonts?.load)Promise.race([document.fonts.load(`700 20px Tajawal`),new Promise(r=>setTimeout(r,1500))]).finally(go);else go();
+</script></body></html>
